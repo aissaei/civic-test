@@ -708,57 +708,69 @@ QUESTIONS = [
 
 NUM_QUESTIONS = 100  # Number of questions per quiz; adjust as needed
 
-def get_random_questions(num):
-    return random.sample(QUESTIONS, min(num, len(QUESTIONS)))
+def init_session_state():
+    if "quiz" not in st.session_state:
+        st.session_state.quiz = random.sample(QUESTIONS, min(NUM_QUESTIONS, len(QUESTIONS)))
+    if "q_index" not in st.session_state:
+        st.session_state.q_index = 0
+    if "score" not in st.session_state:
+        st.session_state.score = 0
+    if "choices_shuffled" not in st.session_state:
+        # Prepare a parallel list to hold shuffled choices for each question
+        st.session_state.choices_shuffled = [
+            random.sample(q["choices"], len(q["choices"])) for q in st.session_state.quiz
+        ]
+    if "selected" not in st.session_state:
+        st.session_state.selected = [None] * len(st.session_state.quiz)
+    if "show_feedback" not in st.session_state:
+        st.session_state.show_feedback = False
 
 def main():
     st.title("N400 Civic Test Practice Quiz")
     st.write("Answer the following randomly-selected civic questions. Good luck!")
 
-    # Session state setup
-    if "quiz" not in st.session_state:
-        st.session_state.quiz = get_random_questions(NUM_QUESTIONS)
-        st.session_state.q_index = 0
-        st.session_state.score = 0
-        st.session_state.selected = [None] * NUM_QUESTIONS
-        st.session_state.show_result = False
+    init_session_state()
 
-    # Main quiz loop
-    if st.session_state.q_index < len(st.session_state.quiz) and not st.session_state.show_result:
+    if st.session_state.q_index < len(st.session_state.quiz):
         idx = st.session_state.q_index
         q = st.session_state.quiz[idx]
+        choices = st.session_state.choices_shuffled[idx]
+
         st.subheader(f"Question {idx + 1} of {len(st.session_state.quiz)}")
         st.write(q["question"])
-        choices = q["choices"].copy()
-        random.shuffle(choices)
-        option = st.radio(
-            "Select your answer:",
-            choices,
-            key=f"q{idx}"
-        )
-        if st.button("Submit", key=f"submit{idx}"):
-            st.session_state.selected[idx] = option
-            if option == q["answer"]:
+
+        selected_option = st.radio("Select your answer:", choices, index=0 if st.session_state.selected[idx] is None else choices.index(st.session_state.selected[idx]), key=f"q{idx}")
+
+        if st.button("Submit", key=f"submit{idx}") and not st.session_state.show_feedback:
+            st.session_state.selected[idx] = selected_option
+            st.session_state.show_feedback = True
+
+            if selected_option == q["answer"]:
                 st.session_state.score += 1
+
+        if st.session_state.show_feedback:
+            if st.session_state.selected[idx] == q["answer"]:
                 st.success("Correct!")
             else:
                 st.error(f"Incorrect. The correct answer is: {q['answer']}")
-            st.session_state.q_index += 1
+            if st.button("Next Question"):
+                st.session_state.q_index += 1
+                st.session_state.show_feedback = False
+                st.experimental_rerun()
 
-    # Show results
-    if (st.session_state.q_index >= len(st.session_state.quiz)) or st.session_state.show_result:
+    else:
         st.write("## Quiz Complete!")
         st.write(f"Your final score is {st.session_state.score} out of {len(st.session_state.quiz)}.")
+        for i, q in enumerate(st.session_state.quiz):
+            st.write(f"**Q{i+1}:** {q['question']}")
+            st.write(f"Your answer: {st.session_state.selected[i]}")
+            st.write(f"Correct answer: {q['answer']}")
+            st.write("---")
         if st.button("Restart Quiz"):
-            for k in ["quiz", "q_index", "score", "selected", "show_result"]:
-                del st.session_state[k]
+            for key in ["quiz", "q_index", "score", "choices_shuffled", "selected", "show_feedback"]:
+                if key in st.session_state:
+                    del st.session_state[key]
             st.experimental_rerun()
-        else:
-            for i, q in enumerate(st.session_state.quiz):
-                st.write(f"**Q{i+1}:** {q['question']}")
-                st.write(f"Your answer: {st.session_state.selected[i]}")
-                st.write(f"Correct answer: {q['answer']}")
-                st.write("---")
 
 if __name__ == "__main__":
     main()
