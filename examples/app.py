@@ -718,9 +718,6 @@ def init_session():
         st.session_state.show_feedback = False
 
 def main():
-    st.title("N400 Civic Test Practice Quiz")
-    st.write("Answer the following randomly-selected civic questions. Good luck!")
-
     init_session()
 
     if st.session_state.q_index < len(st.session_state.quiz):
@@ -731,40 +728,42 @@ def main():
         st.subheader(f"Question {idx + 1} of {len(st.session_state.quiz)}")
         st.write(question["question"])
 
-        selected = st.radio("Select your answer:", choices, index=0 if st.session_state.selected[idx] is None else choices.index(st.session_state.selected[idx]), key=f"q{idx}")
+        selected_idx = 0
+        if st.session_state.selected[idx]:
+            try:
+                selected_idx = choices.index(st.session_state.selected[idx])
+            except:
+                selected_idx = 0
 
-        if st.button("Submit", key=f"submit{idx}") and not st.session_state.show_feedback:
-            st.session_state.selected[idx] = selected
-            st.session_state.show_feedback = True
-            if selected == question["answer"]:
-                st.session_state.score += 1
+        # Question radio buttons
+        selected = st.radio("Select your answer:", choices, index=selected_idx, key=f"q{idx}")
 
-        if st.session_state.show_feedback:
+        if not st.session_state.show_feedback:
+            if st.button("Submit", key=f"submit{idx}"):
+                st.session_state.selected[idx] = selected
+                st.session_state.show_feedback = True
+                if selected == question["answer"]:
+                    st.session_state.score += 1
+        else:
             if st.session_state.selected[idx] == question["answer"]:
                 st.success("Correct!")
             else:
                 st.error(f"Incorrect. The correct answer is: {question['answer']}")
 
-            if st.button("Next Question"):
+            if st.button("Next Question", key=f"next{idx}"):
                 st.session_state.q_index += 1
                 st.session_state.show_feedback = False
-                # No explicit rerun needed; Streamlit auto reruns on session state change
+                st.experimental_rerun()  # or remove if your Streamlit version disallows it
 
     else:
-        st.write("## Quiz Complete!")
-        st.write(f"Your final score is {st.session_state.score} out of {len(st.session_state.quiz)}.")
-        for i, q in enumerate(st.session_state.quiz):
-            st.write(f"**Q{i+1}:** {q['question']}")
-            st.write(f"Your answer: {st.session_state.selected[i]}")
-            st.write(f"Correct answer: {q['answer']}")
-            st.write("---")
-
-        if st.button("Restart Quiz"):
-            keys = ["quiz", "q_index", "score", "choices_shuffled", "selected", "show_feedback"]
-            for key in keys:
+        # Quiz complete logic
+        st.write("### Quiz complete!")
+        st.write(f"Your score: {st.session_state.score} / {len(st.session_state.quiz)}")
+        if st.button("Restart"):
+            for key in ["quiz", "q_index", "score", "choices_shuffled", "selected", "show_feedback"]:
                 if key in st.session_state:
                     del st.session_state[key]
-            # No st.experimental_rerun call here either
+            st.experimental_rerun()
 
 if __name__ == "__main__":
     main()
